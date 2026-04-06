@@ -85,7 +85,7 @@
     // --- CONFIGURACIÓN SUPABASE (RELLENAR) ---
     const SB_URL = 'https://ldepgchjtfjtzhvshtnm.supabase.co';
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxkZXBnY2hqdGZqdHpodnNodG5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1MDMxNzcsImV4cCI6MjA5MTA3OTE3N30.vkMs-CaRCdlmHE-9UFlTc3IMH_0KUS7qXBSciW8klEE';
-    const supabase = exports = window.supabase.createClient(SB_URL, SB_KEY);
+    const client = exports = window.supabase.createClient(SB_URL, SB_KEY);
 
     // --- ESTADO DE LA APP ---
     const users = ["Dani", "Mikel", "PN", "Rolo", "Shaka"];
@@ -126,7 +126,7 @@
     }
 
     async function fetchData() {
-        const { data, error } = await supabase.from('disponibilidad').select('*');
+        const { data, error } = await client.from('disponibilidad').select('*');
         if (!error) {
             dbData = data;
             updateCalendarUI();
@@ -229,7 +229,7 @@
         }
 
         // Upsert en Supabase
-        const { error } = await supabase.from('disponibilidad').upsert(datesToUpdate, { onConflict: 'usuario,fecha' });
+        const { error } = await client.from('disponibilidad').upsert(datesToUpdate, { onConflict: 'usuario,fecha' });
         if (error) console.error(error);
         fetchData();
     }
