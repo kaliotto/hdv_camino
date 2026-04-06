@@ -11,6 +11,7 @@
             --text: #333;
             --black: #1a1a1a;
             --blue-select: #3b82f6;
+            --red-delete: #ef4444;
             --green-1: #dcfce7;
             --green-2: #86efac;
             --green-3: #4ade80;
@@ -26,12 +27,13 @@
         
         button { padding: 12px 24px; border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s ease; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .user-btn { background: white; color: #555; }
-        .user-btn.active { background: var(--blue-select); color: white; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); }
+        .user-btn.active { background: var(--blue-select); color: white; transform: translateY(-2px); box-shadow: 0 4px 12|2px rgba(59, 130, 246, 0.4); }
 
         .controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 30px; background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
         .mode-btn { border: 2px solid #eee; background: white; }
         .mode-btn.active.verde { border-color: var(--green-4); background: var(--green-4); color: white; }
         .mode-btn.active.negro { border-color: var(--black); background: var(--black); color: white; }
+        .mode-btn.active.borrar { border-color: var(--red-delete); background: var(--red-delete); color: white; }
         
         #status-msg { font-size: 0.9rem; font-weight: 600; color: #666; width: 100%; text-align: center; margin-top: 10px; min-height: 1.2em; }
 
@@ -47,7 +49,6 @@
         .day.empty { border: none; cursor: default; }
         .day.empty:hover { transform: none; box-shadow: none; }
 
-        /* Feedback visual de selección */
         .day.selecting { outline: 3px solid var(--blue-select); outline-offset: -3px; animation: pulse 1s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
 
@@ -74,7 +75,7 @@
 <div class="container">
     <div class="header">
         <h1>🚶‍♂️ HDV - Camino 2026-2027</h1>
-        <p>Marca disponibilidad (Verde) o bloqueos (Negro)</p>
+        <p>Marca disponibilidad (Verde), bloqueos (Negro) o limpia tus datos (Rojo)</p>
     </div>
 
     <div class="user-selector" id="user-selector"></div>
@@ -82,6 +83,7 @@
     <div class="controls">
         <button class="mode-btn verde active" id="mode-verde" onclick="setMode('verde')">🟩 Marcar 7 días (SI)</button>
         <button class="mode-btn negro" id="mode-negro" onclick="setMode('negro')">⬛ Marcar Rango (NO)</button>
+        <button class="mode-btn borrar" id="mode-borrar" onclick="setMode('borrar')">❌ Borrar mis datos</button>
         <div id="status-msg">Selecciona quién eres para empezar</div>
     </div>
 
@@ -92,7 +94,6 @@
     const SB_URL = 'https://ldepgchjtfjtzhvshtnm.supabase.co';
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxkZXBnY2hqdGZqdHpodnNodG5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1MDMxNzcsImV4cCI6MjA5MTA3OTE3N30.vkMs-CaRCdlmHE-9UFlTc3IMH_0KUS7qXBSciW8klEE';
     
-    // Inicialización limpia de Supabase
     const client = window.supabase.createClient(SB_URL, SB_KEY);
 
     const users = ["Dani", "Mikel", "PN", "Rolo", "Shaka"];
@@ -127,17 +128,20 @@
     function updateStatusMsg() {
         const msg = document.getElementById('status-msg');
         if (!currentUser) return;
-        msg.innerText = currentMode === 'verde' 
-            ? `${currentUser}: Haz clic en el primer día del viaje (se marcarán 7)` 
-            : (selectionStep === 0 ? `${currentUser}: Haz clic en el INICIO del bloqueo` : `${currentUser}: Haz clic en el FINAL del bloqueo`);
+        
+        if (currentMode === 'verde') {
+            msg.innerText = `${currentUser}: Haz clic en el primer día (se marcarán 7 días)`;
+        } else if (currentMode === 'negro') {
+            msg.innerText = (selectionStep === 0 ? `${currentUser}: Haz clic en el INICIO del bloqueo` : `${currentUser}: Haz clic en el FINAL del bloqueo`);
+        } else {
+            msg.innerText = `${currentUser}: Haz clic en un día para BORRAR tu voto o bloqueo`;
+        }
     }
 
     function setMode(mode) {
         currentMode = mode;
         selectionStep = 0;
-        // Limpiar estilos de selección previa
         document.querySelectorAll('.day.selecting').forEach(el => el.classList.remove('selecting'));
-        
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
         document.getElementById(`mode-${mode}`).classList.add('active');
         updateStatusMsg();
@@ -171,7 +175,6 @@
         
         const daysGrid = document.createElement('div');
         daysGrid.className = 'days-grid';
-        
         ['L','M','X','J','V','S','D'].forEach(d => { daysGrid.innerHTML += `<div class="day-name">${d}</div>`; });
 
         const firstDay = (new Date(year, month, 1).getDay() + 6) % 7;
@@ -205,11 +208,23 @@
     async function handleDateClick(dateStr) {
         if (!currentUser) return alert("¡Primero dinos quién eres!");
 
+        // Lógica de BORRADO
+        if (currentMode === 'borrar') {
+            const { error } = await client
+                .from('disponibilidad')
+                .delete()
+                .eq('usuario', currentUser)
+                .eq('fecha', dateStr);
+            
+            if (error) alert("Error al borrar el dato");
+            fetchData();
+            return;
+        }
+
         let datesToUpdate = [];
         
         if (currentMode === 'verde') {
-            // Lógica 7 días
-            let baseDate = new Date(dateStr + "T12:00:00"); // Forzamos mediodía para evitar errores de zona horaria
+            let baseDate = new Date(dateStr + "T12:00:00");
             for (let i = 0; i < 7; i++) {
                 let d = new Date(baseDate);
                 d.setDate(baseDate.getDate() + i);
@@ -220,7 +235,6 @@
                 });
             }
         } else {
-            // Lógica Rango Negro
             if (selectionStep === 0) {
                 rangeStart = dateStr;
                 selectionStep = 1;
